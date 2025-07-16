@@ -1,0 +1,8 @@
+# Rich Text Editor
+This is a repo dedicated to me experimenting with Rich Text Editors. What they and how they work.
+
+
+So far, I've done some prototyping of how I represent my document. I built it in svelte so that I can because I wanted a declarative way to create dom elements and I like svelte for that. 
+
+Here's the link to the prototype: [Link](https://svelte.dev/playground/ff40b21fb31d45339ff7c7f196ebc49d?version=5.34.7)
+

@@ -1,0 +1,7 @@
+#editor {
+    max-width: 65ch;
+    margin: 0 auto;
+    border: 1px solid;
+    min-height: 100px;
+    padding: 1rem;
+}
