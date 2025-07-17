@@ -13,7 +13,6 @@ class PlainTextDocument {
         if (!this.node) {
             throw new Error("No node passed in");
         }
-        // let ref = this;
         this.node.addEventListener("click", (e) => {
             console.log(e);
             const selection = window.getSelection();
@@ -38,8 +37,7 @@ class PlainTextDocument {
         this.node.addEventListener("beforeinput", (e) => {
             e.preventDefault();
             console.log(e);
-            const selection = window.getSelection();
-            console.log(selection);
+
             switch (e.inputType) {
                 case "insertText":
                     console.log("cursorPos", this.cursorPos);
@@ -51,18 +49,53 @@ class PlainTextDocument {
                     this.cursorPos += e.data!.length;
                     break;
                 case "deleteContentBackward":
+                    console.log(this);
                     if (this.cursorPos == 0) {
                         return;
                     }
-                    this.text[this.index] = this.text[this.index]
-                        .slice(0, this.cursorPos - 1)
-                        .concat(...this.text.slice(this.cursorPos + 1));
+                    console.log(
+                        "cursor",
+                        this.cursorPos,
+                        "test",
+                        this.text[this.index].slice(0, this.cursorPos - 1),
+                        this.text[this.index].slice(this.cursorPos)
+                    );
+                    this.text[this.index] =
+                        this.text[this.index].slice(0, this.cursorPos - 1) +
+                        this.text[this.index].slice(this.cursorPos);
                     this.cursorPos -= 1;
+                    break;
+                case "insertParagraph":
+                    console.log(this.cursorPos, this.text[this.index].length);
+                    // Need to handle two case
+                    let newCursorPos = 0;
+                    // Case 1: Trying to create paragraph at end of paragraph
+                    if (this.cursorPos == this.text[this.index].length) {
+                        this.text.splice(this.index + 1, 0, "");
+                    } else {
+                        // Case 2: Try to create paragraph in middle of a paragraph
+                        const textToRemain = this.text[this.index].slice(
+                            0,
+                            this.cursorPos
+                        );
+                        const textForNewParagraph = this.text[this.index].slice(
+                            this.cursorPos
+                        );
+                        this.text[this.index] = textToRemain;
+                        this.text.splice(
+                            this.index + 1,
+                            0,
+                            textForNewParagraph
+                        );
+                        newCursorPos = textForNewParagraph.length;
+                    }
+                    console.log(this.text);
+                    this.cursorPos = newCursorPos;
+                    this.index += 1;
                     break;
                 default:
                     throw Error("WIP");
             }
-            this.render();
         });
     }
     render() {
