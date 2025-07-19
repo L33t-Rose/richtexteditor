@@ -96,6 +96,7 @@ class PlainTextDocument {
                 default:
                     throw Error("WIP");
             }
+            this.render();
         });
     }
     render() {
