@@ -17,6 +17,8 @@ class PlainTextDocument {
         let curr = e;
         // Traverse up the DOM tree to find the closest node with the data-editorindex attr
         // This is for later on when we actually add in rich text
+        // TODO: Try to make the typesafety better with curr.dataset
+        // @ts-expect-error
         while (curr.nodeName === "#text" || !("editor_index" in curr.dataset)) {
             console.log(curr);
             if (!curr.parentElement) {
@@ -26,6 +28,7 @@ class PlainTextDocument {
             }
             curr = curr.parentElement;
         }
+        // @ts-expect-error
         const textIndex = Number.parseInt(curr.dataset.editor_index!);
         this.index = textIndex;
     }
@@ -86,7 +89,7 @@ class PlainTextDocument {
                     break;
                 case "deleteContentBackward":
                     console.log(this);
-                    if (this.cursorPos == 0) {
+                    if (this.index === 0 && this.cursorPos == 0) {
                         return;
                     }
                     console.log(
@@ -96,10 +99,22 @@ class PlainTextDocument {
                         this.text[this.index].slice(0, this.cursorPos - 1),
                         this.text[this.index].slice(this.cursorPos)
                     );
-                    this.text[this.index] =
-                        this.text[this.index].slice(0, this.cursorPos - 1) +
-                        this.text[this.index].slice(this.cursorPos);
-                    this.cursorPos -= 1;
+                    if (this.cursorPos == 0) {
+                        const prevTextLength = this.text[this.index - 1].length;
+                        // Combine the text above with the current one.
+                        this.text[this.index - 1] =
+                            this.text[this.index - 1] + this.text[this.index];
+                        // Move cursor
+                        this.cursorPos = prevTextLength;
+                        // Erase current one from array
+                        this.text.splice(this.index, 1);
+                        this.index -= 1;
+                    } else {
+                        this.text[this.index] =
+                            this.text[this.index].slice(0, this.cursorPos - 1) +
+                            this.text[this.index].slice(this.cursorPos);
+                        this.cursorPos -= 1;
+                    }
                     break;
                 case "insertParagraph":
                     console.log(this.cursorPos, this.text[this.index].length);
@@ -123,10 +138,10 @@ class PlainTextDocument {
                             0,
                             textForNewParagraph
                         );
-                        newCursorPos = textForNewParagraph.length;
+                        // newCursorPos = textForNewParagraph.length;
                     }
                     console.log(this.text);
-                    this.cursorPos = newCursorPos;
+                    this.cursorPos = 0;
                     this.index += 1;
                     break;
                 default:
