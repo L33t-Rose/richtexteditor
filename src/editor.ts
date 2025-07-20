@@ -8,31 +8,67 @@ class PlainTextDocument {
         this.text = text.split("\n");
         console.log(this.text);
         this.node = node;
+        this.registerListeners();
     }
-    init() {
+    private updateIndex(e: HTMLElement | EventTarget) {
+        if (!(e instanceof HTMLElement) && !(e instanceof Node)) {
+            throw new Error("Non-element passed into updateIndex");
+        }
+        let curr = e;
+        // Traverse up the DOM tree to find the closest node with the data-editorindex attr
+        // This is for later on when we actually add in rich text
+        while (curr.nodeName === "#text" || !("editor_index" in curr.dataset)) {
+            console.log(curr);
+            if (!curr.parentElement) {
+                throw new Error(
+                    "Encountered element in editor that's not associated with any of our nodes"
+                );
+            }
+            curr = curr.parentElement;
+        }
+        const textIndex = Number.parseInt(curr.dataset.editor_index!);
+        this.index = textIndex;
+    }
+    private registerListeners() {
         if (!this.node) {
             throw new Error("No node passed in");
         }
         this.node.addEventListener("click", (e) => {
-            console.log(e);
+            if (!e.target) {
+                return;
+            }
             const selection = window.getSelection();
-            console.log(selection);
             if (!selection) {
                 return;
             }
             if (selection.type == "Range") {
                 throw new Error("We don't support ranges yet");
             }
-            console.log();
             this.cursorPos = selection.anchorOffset;
+            this.updateIndex(e.target);
+            console.log("cursorPos", this.cursorPos, "index", this.index);
         });
         this.node.addEventListener("keyup", (e) => {
-            if (e.key != "ArrowLeft" && e.key != "ArrowRight") {
+            if (!e.target) {
+                return;
+            }
+            if (
+                e.key != "ArrowLeft" &&
+                e.key != "ArrowRight" &&
+                e.key != "ArrowUp" &&
+                e.key != "ArrowDown"
+            ) {
                 return;
             }
             console.log(e);
             const selection = window.getSelection();
+            if (!selection) {
+                throw new Error("No Selection?");
+            }
             console.log("selection after moving", selection);
+            this.cursorPos = selection.anchorOffset;
+            this.updateIndex(selection.anchorNode!);
+            console.log("cursorPos", this.cursorPos, "index", this.index);
         });
         this.node.addEventListener("beforeinput", (e) => {
             e.preventDefault();
@@ -97,19 +133,39 @@ class PlainTextDocument {
                     throw Error("WIP");
             }
             this.render();
+            /**
+             * Naive solution for cursor management
+             * This works by targetting the internal text nodes inside of our elements.
+             * We can then create a range within the text node at wherever cursorPos is and then just
+             * add it to the current caret.
+             */
+            const range = document.createRange();
+            range.setStart(
+                this.node.childNodes[this.index].childNodes[0],
+                this.cursorPos
+            );
+            range.setEnd(
+                this.node.childNodes[this.index].childNodes[0],
+                this.cursorPos
+            );
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(range);
         });
     }
     render() {
-        console.log(this.text);
         this.node.replaceChildren(
-            ...this.text.map((part) => {
-                // console.log(part);
+            ...this.text.map((part, index) => {
                 const a = document.createElement("p");
                 if (part === "") {
                     a.appendChild(document.createElement("br"));
                 } else {
-                    a.textContent = part;
+                    // Per the spec the browser trims whitespace so I'm manually escaping the spaces when rendering
+                    // TODO: We don't support tabs right now because pressing tab will cause the focus to leave the editor
+                    a.innerHTML = part.replaceAll(" ", "&nbsp;");
+                    // .replaceAll("\t", "&#09;");
                 }
+                a.dataset.editor_index = index.toString();
                 return a;
             })
         );
@@ -117,6 +173,8 @@ class PlainTextDocument {
 }
 
 const editor = document.getElementById("editor");
-const doc = new PlainTextDocument(editor!, "here\n\nsure\n");
-doc.init();
+const doc = new PlainTextDocument(
+    editor!,
+    "This is editable.\n\nJunior Was Here"
+);
 doc.render();
