@@ -172,13 +172,21 @@ class PlainTextDocument {
         this.node.replaceChildren(
             ...this.text.map((part, index) => {
                 const a = document.createElement("p");
+
                 if (part === "") {
                     a.appendChild(document.createElement("br"));
                 } else {
-                    // Per the spec the browser trims whitespace so I'm manually escaping the spaces when rendering
+                    // Per the spec the browser trims whitespace so I'm manually escaping the last space when rendering
                     // TODO: We don't support tabs right now because pressing tab will cause the focus to leave the editor
-                    a.innerHTML = part.replaceAll(" ", "&nbsp;");
-                    // .replaceAll("\t", "&#09;");
+                    const toBeDisplayed = part.endsWith(" ")
+                        ? part.slice(0, part.length - 1) + "&nbsp;"
+                        : part;
+                    // We need to do alternating between space and escaped space because if we don't the browser
+                    // Will treat content as one long word thus preventing word wrapping to fail..
+                    a.innerHTML = toBeDisplayed.replaceAll(
+                        /\s{2}/gm,
+                        " &nbsp;"
+                    );
                 }
                 a.dataset.editor_index = index.toString();
                 return a;
@@ -190,6 +198,6 @@ class PlainTextDocument {
 const editor = document.getElementById("editor");
 const doc = new PlainTextDocument(
     editor!,
-    "This is editable.\n\nJunior Was Here"
+    "This is editable. Jeez I'm going to have to make this really long in order for me to test text wrapping when my text editor. I'm noticing super weird behaviors\n\nJunior Was Here"
 );
 doc.render();
