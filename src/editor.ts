@@ -178,15 +178,19 @@ class PlainTextDocument {
                 } else {
                     // Per the spec the browser trims whitespace so I'm manually escaping the last space when rendering
                     // TODO: We don't support tabs right now because pressing tab will cause the focus to leave the editor
-                    const toBeDisplayed = part.endsWith(" ")
-                        ? part.slice(0, part.length - 1) + "&nbsp;"
-                        : part;
+                    let toBeDisplayed = part.replaceAll(/\s{2}/gm, " &nbsp;");
+                    if (toBeDisplayed.startsWith(" ")) {
+                        toBeDisplayed = "&nbsp;" + toBeDisplayed.slice(1);
+                    }
+                    if (toBeDisplayed.endsWith(" ")) {
+                        toBeDisplayed =
+                            toBeDisplayed.slice(0, toBeDisplayed.length - 1) +
+                            "&nbsp;";
+                    }
+
                     // We need to do alternating between space and escaped space because if we don't the browser
                     // Will treat content as one long word thus preventing word wrapping to fail..
-                    a.innerHTML = toBeDisplayed.replaceAll(
-                        /\s{2}/gm,
-                        " &nbsp;"
-                    );
+                    a.innerHTML = toBeDisplayed;
                 }
                 a.dataset.editor_index = index.toString();
                 return a;
