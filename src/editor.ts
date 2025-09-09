@@ -10,7 +10,7 @@ class PlainTextDocument {
         this.node = node;
         this.registerListeners();
     }
-    private updateIndex(e: HTMLElement | EventTarget) {
+    private updateIndex(e: HTMLElement | Node) {
         if (!(e instanceof HTMLElement) && !(e instanceof Node)) {
             throw new Error("Non-element passed into updateIndex");
         }
@@ -20,7 +20,6 @@ class PlainTextDocument {
         // TODO: Try to make the typesafety better with curr.dataset
         // @ts-expect-error
         while (curr.nodeName === "#text" || !("editor_index" in curr.dataset)) {
-            console.log(curr);
             if (!curr.parentElement) {
                 throw new Error(
                     "Encountered element in editor that's not associated with any of our nodes"
@@ -36,42 +35,26 @@ class PlainTextDocument {
         if (!this.node) {
             throw new Error("No node passed in");
         }
-        this.node.addEventListener("click", (e) => {
-            if (!e.target) {
+        document.addEventListener("selectionchange", (e) => {
+            console.log("change", e, window.getSelection());
+            if (e.target === null) {
                 return;
             }
             const selection = window.getSelection();
             if (!selection) {
                 return;
             }
-            if (selection.type == "Range") {
-                throw new Error("We don't support ranges yet");
-            }
-            this.cursorPos = selection.anchorOffset;
-            this.updateIndex(e.target);
+            // when you click out of the editor selectionchange gets triggered so we should check for this
+            // before updating any state.
+            // if (selection.type == "Range") {
+            //     console.log("selection", selection);
+            //     throw new Error("We don't support ranges yet");
+            // }
+            this.cursorPos = selection.focusOffset;
+            this.updateIndex(selection.focusNode!);
             console.log("cursorPos", this.cursorPos, "index", this.index);
-        });
-        this.node.addEventListener("keyup", (e) => {
-            if (!e.target) {
-                return;
-            }
-            if (
-                e.key != "ArrowLeft" &&
-                e.key != "ArrowRight" &&
-                e.key != "ArrowUp" &&
-                e.key != "ArrowDown"
-            ) {
-                return;
-            }
-            console.log(e);
-            const selection = window.getSelection();
-            if (!selection) {
-                throw new Error("No Selection?");
-            }
-            console.log("selection after moving", selection);
-            this.cursorPos = selection.anchorOffset;
-            this.updateIndex(selection.anchorNode!);
-            console.log("cursorPos", this.cursorPos, "index", this.index);
+            //@ts-ignore
+            debug.textContent = `cursorPos ${this.cursorPos}, "index", ${this.index}`;
         });
         this.node.addEventListener("beforeinput", (e) => {
             e.preventDefault();
