@@ -4,6 +4,7 @@ class PlainTextDocument {
     node: HTMLElement;
     cursorPos: number = 1;
     index = 0;
+    currentRange: Selection | null = null;
     constructor(node: HTMLElement, text: string) {
         this.text = text.split("\n");
         console.log(this.text);
@@ -31,10 +32,12 @@ class PlainTextDocument {
         const textIndex = Number.parseInt(curr.dataset.editor_index!);
         this.index = textIndex;
     }
+
     private registerListeners() {
         if (!this.node) {
             throw new Error("No node passed in");
         }
+        // Turns out selectionchange doesn't activate for contenteditable elements for some reason...
         document.addEventListener("selectionchange", (e) => {
             console.log("change", e, window.getSelection());
             if (e.target === null) {
@@ -44,12 +47,16 @@ class PlainTextDocument {
             if (!selection) {
                 return;
             }
+            if (selection.focusNode instanceof Document) {
+                console.log("Here");
+                return;
+            }
             // when you click out of the editor selectionchange gets triggered so we should check for this
             // before updating any state.
-            // if (selection.type == "Range") {
-            //     console.log("selection", selection);
-            //     throw new Error("We don't support ranges yet");
-            // }
+            if (selection.type == "Range") {
+                console.log("selection", selection);
+                throw new Error("We don't support ranges yet");
+            }
             this.cursorPos = selection.focusOffset;
             this.updateIndex(selection.focusNode!);
             console.log("cursorPos", this.cursorPos, "index", this.index);
