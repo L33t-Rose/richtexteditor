@@ -11,6 +11,17 @@ class PlainTextDocument {
         this.node = node;
         this.registerListeners();
     }
+    private getParentIndex(e: Node) {
+        let index = -1;
+        let current: Node | HTMLElement = e;
+        while (
+            current.nodeName === "#text" ||
+            !("editor_index" in current.dataset)
+        ) {
+            current = e.parentElement;
+        }
+        return Number.parseInt(current.dataset.editor_index!);
+    }
     private updateIndex(e: HTMLElement | Node) {
         if (!(e instanceof HTMLElement) && !(e instanceof Node)) {
             throw new Error("Non-element passed into updateIndex");
@@ -64,7 +75,7 @@ class PlainTextDocument {
             //@ts-ignore
             debug.textContent = `cursorPos ${this.cursorPos}, "index", ${this.index}`;
         });
-        this.node.addEventListener("beforeinput", (e) => {
+        this.node.addEventListener("beforeinput", async (e) => {
             e.preventDefault();
             console.log(e);
 
@@ -72,6 +83,8 @@ class PlainTextDocument {
                 case "insertFromPaste":
                 case "insertReplacementText":
                 case "insertText":
+                    // When insertFromPaste and insertReplacementText happen e.data is null 
+                    // and their content inside of dataTransfer
                     const data =
                         e.data ??
                         (await new Promise((res) => {
@@ -84,18 +97,83 @@ class PlainTextDocument {
                     // Notice how the code for handling range and caret selections are the same?
                     // We should just merge these and just keep track of a currentSelection.
                     if (this.currentRange) {
-                        const begin =
-                            this.currentRange.direction === "backward"
-                                ? this.currentRange.focusOffset
-                                : this.currentRange.anchorOffset;
-                        const end =
-                            this.currentRange.direction === "backward"
-                                ? this.currentRange.anchorOffset
-                                : this.currentRange.focusOffset;
-                        this.text[this.index] =
-                            this.text[this.index].slice(0, begin) +
-                            data! +
-                            this.text[this.index].slice(end);
+                        // Multi-line support
+                        if (
+                            !(
+                                this.currentRange.anchorNode ===
+                                this.currentRange.focusNode
+                            )
+                        ) {
+                            // Compute the indexes of the anchor (a) and focus nodes (b)
+                            const top =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.focusNode!
+                                    : this.currentRange.anchorNode!;
+
+                            const bottom =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.anchorNode!
+                                    : this.currentRange.focusNode!;
+                            const topOffset =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.focusOffset
+                                    : this.currentRange.anchorOffset;
+                            const bottomOffset =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.anchorOffset
+                                    : this.currentRange.focusOffset;
+
+                            const topIndex = this.getParentIndex(top);
+                            const bottomIndex = this.getParentIndex(bottom);
+
+                            // We might have to merge the text in the anchor with the focus
+                            const newText =
+                                this.text[topIndex].slice(0, topOffset) +
+                                data +
+                                this.text[bottomIndex].slice(bottomOffset);
+
+                            this.text[topIndex] = newText;
+
+                            // Delete everything between a to b
+                            this.text.splice(
+                                topIndex + 1,
+                                bottomIndex - topIndex,
+                            );
+
+                            // Update index to anchorNode's index and then update cursorPosition
+                            this.index = topIndex;
+                            this.cursorPos = topOffset + data!.length;
+                            console.log("newText", newText);
+                            console.log(
+                                "new text array",
+                                this.text.splice(
+                                    topIndex + 1,
+                                    bottomIndex - topIndex,
+                                ),
+                            );
+                            // throw "no";
+                            // Iterate from a to b
+                            // Delete everything between a to b
+                            // We might have to merge the text in the anchor with the focus
+                        } else {
+                            const begin =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.focusOffset
+                                    : this.currentRange.anchorOffset;
+                            const end =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.anchorOffset
+                                    : this.currentRange.focusOffset;
+                            console.log(
+                                "same?",
+                                this.currentRange.anchorNode ===
+                                    this.currentRange.focusNode,
+                            );
+
+                            this.text[this.index] =
+                                this.text[this.index].slice(0, begin) +
+                                data! +
+                                this.text[this.index].slice(end);
 
                         this.cursorPos = begin + data!.length;
                         this.currentRange = null;
