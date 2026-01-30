@@ -55,7 +55,8 @@ class PlainTextDocument {
             // before updating any state.
             if (selection.type == "Range") {
                 console.log("selection", selection);
-                throw new Error("We don't support ranges yet");
+                this.currentRange = selection;
+                // throw new Error("We don't support ranges yet");
             }
             this.cursorPos = selection.focusOffset;
             this.updateIndex(selection.focusNode!);
@@ -70,12 +71,30 @@ class PlainTextDocument {
             switch (e.inputType) {
                 case "insertText":
                     console.log("cursorPos", this.cursorPos);
+                    if (this.currentRange) {
+                        const begin =
+                            this.currentRange.direction === "backward"
+                                ? this.currentRange.focusOffset
+                                : this.currentRange.anchorOffset;
+                        const end =
+                            this.currentRange.direction === "backward"
+                                ? this.currentRange.anchorOffset
+                                : this.currentRange.focusOffset;
+                        this.text[this.index] =
+                            this.text[this.index].slice(0, begin) +
+                            e.data! +
+                            this.text[this.index].slice(end);
+
+                        this.cursorPos = begin + e.data!.length;
+                        this.currentRange = null;
+                    } else {
                     this.text[this.index] =
                         this.text[this.index].slice(0, this.cursorPos) +
                         e.data! +
                         this.text[this.index].slice(this.cursorPos);
 
                     this.cursorPos += e.data!.length;
+                    }
                     break;
                 case "deleteContentBackward":
                     console.log(this);
@@ -87,7 +106,7 @@ class PlainTextDocument {
                         this.cursorPos,
                         "test",
                         this.text[this.index].slice(0, this.cursorPos - 1),
-                        this.text[this.index].slice(this.cursorPos)
+                        this.text[this.index].slice(this.cursorPos),
                     );
                     if (this.cursorPos == 0) {
                         const prevTextLength = this.text[this.index - 1].length;
