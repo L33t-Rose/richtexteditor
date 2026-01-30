@@ -12,13 +12,9 @@ class PlainTextDocument {
         this.registerListeners();
     }
     private getParentIndex(e: Node) {
-        let index = -1;
-        let current: Node | HTMLElement = e;
-        while (
-            current.nodeName === "#text" ||
-            !("editor_index" in current.dataset)
-        ) {
-            current = e.parentElement;
+        let current = e.parentElement!;
+        while (!("editor_index" in current.dataset)) {
+            current = e.parentElement!;
         }
         return Number.parseInt(current.dataset.editor_index!);
     }
@@ -177,6 +173,7 @@ class PlainTextDocument {
 
                         this.cursorPos = begin + data!.length;
                         this.currentRange = null;
+                        }
                     } else {
                     this.text[this.index] =
                         this.text[this.index].slice(0, this.cursorPos) +
