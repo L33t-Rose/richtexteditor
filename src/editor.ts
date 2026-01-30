@@ -69,8 +69,20 @@ class PlainTextDocument {
             console.log(e);
 
             switch (e.inputType) {
+                case "insertFromPaste":
+                case "insertReplacementText":
                 case "insertText":
+                    const data =
+                        e.data ??
+                        (await new Promise((res) => {
+                            e.dataTransfer?.items[0].getAsString((dtString) =>
+                                res(dtString),
+                            );
+                        }));
+                    console.log("data", data);
                     console.log("cursorPos", this.cursorPos);
+                    // Notice how the code for handling range and caret selections are the same?
+                    // We should just merge these and just keep track of a currentSelection.
                     if (this.currentRange) {
                         const begin =
                             this.currentRange.direction === "backward"
@@ -82,18 +94,18 @@ class PlainTextDocument {
                                 : this.currentRange.focusOffset;
                         this.text[this.index] =
                             this.text[this.index].slice(0, begin) +
-                            e.data! +
+                            data! +
                             this.text[this.index].slice(end);
 
-                        this.cursorPos = begin + e.data!.length;
+                        this.cursorPos = begin + data!.length;
                         this.currentRange = null;
                     } else {
                     this.text[this.index] =
                         this.text[this.index].slice(0, this.cursorPos) +
-                        e.data! +
+                            data! +
                         this.text[this.index].slice(this.cursorPos);
 
-                    this.cursorPos += e.data!.length;
+                        this.cursorPos += data!.length;
                     }
                     break;
                 case "deleteContentBackward":
