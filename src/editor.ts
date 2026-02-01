@@ -139,18 +139,6 @@ class PlainTextDocument {
                             // Update index to anchorNode's index and then update cursorPosition
                             this.index = topIndex;
                             this.cursorPos = topOffset + data!.length;
-                            console.log("newText", newText);
-                            console.log(
-                                "new text array",
-                                this.text.splice(
-                                    topIndex + 1,
-                                    bottomIndex - topIndex,
-                                ),
-                            );
-                            // throw "no";
-                            // Iterate from a to b
-                            // Delete everything between a to b
-                            // We might have to merge the text in the anchor with the focus
                         } else {
                             const begin =
                                 this.currentRange.direction === "backward"
@@ -185,7 +173,11 @@ class PlainTextDocument {
                     break;
                 case "deleteContentBackward":
                     console.log(this);
-                    if (this.index === 0 && this.cursorPos == 0) {
+                    if (
+                        !this.currentRange &&
+                        this.index === 0 &&
+                        this.cursorPos == 0
+                    ) {
                         return;
                     }
                     console.log(
@@ -195,7 +187,43 @@ class PlainTextDocument {
                         this.text[this.index].slice(0, this.cursorPos - 1),
                         this.text[this.index].slice(this.cursorPos),
                     );
-                    if (this.cursorPos == 0) {
+                    if (this.currentRange) {
+                        const top =
+                            this.currentRange.direction === "backward"
+                                ? this.currentRange.focusNode!
+                                : this.currentRange.anchorNode!;
+
+                        const bottom =
+                            this.currentRange.direction === "backward"
+                                ? this.currentRange.anchorNode!
+                                : this.currentRange.focusNode!;
+                        const topOffset =
+                            this.currentRange.direction === "backward"
+                                ? this.currentRange.focusOffset
+                                : this.currentRange.anchorOffset;
+                        const bottomOffset =
+                            this.currentRange.direction === "backward"
+                                ? this.currentRange.anchorOffset
+                                : this.currentRange.focusOffset;
+                        const topIndex = this.getParentIndex(top);
+                        const bottomIndex = this.getParentIndex(bottom);
+
+                        // We might have to merge the text in the anchor with the focus
+                        const newText =
+                            this.text[topIndex].slice(0, topOffset) +
+                            this.text[bottomIndex].slice(bottomOffset);
+
+                        this.text[topIndex] = newText;
+
+                        // Delete everything between a to b
+                        this.text.splice(topIndex + 1, bottomIndex - topIndex);
+
+                        // Update index to anchorNode's index and then update cursorPosition
+                        this.index = topIndex;
+                        this.cursorPos = topOffset;
+                        // }
+                        this.currentRange = null;
+                    } else if (this.cursorPos == 0) {
                         const prevTextLength = this.text[this.index - 1].length;
                         // Combine the text above with the current one.
                         this.text[this.index - 1] =
