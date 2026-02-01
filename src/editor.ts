@@ -30,7 +30,7 @@ class PlainTextDocument {
         while (curr.nodeName === "#text" || !("editor_index" in curr.dataset)) {
             if (!curr.parentElement) {
                 throw new Error(
-                    "Encountered element in editor that's not associated with any of our nodes"
+                    "Encountered element in editor that's not associated with any of our nodes",
                 );
             }
             curr = curr.parentElement;
@@ -46,6 +46,7 @@ class PlainTextDocument {
         }
         // Turns out selectionchange doesn't activate for contenteditable elements for some reason...
         document.addEventListener("selectionchange", (e) => {
+            console.log("cursorchange");
             console.log("change", e, window.getSelection());
             if (e.target === null) {
                 return;
@@ -54,12 +55,12 @@ class PlainTextDocument {
             if (!selection) {
                 return;
             }
+            // when you click out of the editor selectionchange gets triggered so we should check for this
+            // before updating any state.
             if (selection.focusNode instanceof Document) {
                 console.log("Here");
                 return;
             }
-            // when you click out of the editor selectionchange gets triggered so we should check for this
-            // before updating any state.
             if (selection.type == "Range") {
                 console.log("selection", selection);
                 this.currentRange = selection;
@@ -73,13 +74,14 @@ class PlainTextDocument {
         });
         this.node.addEventListener("beforeinput", async (e) => {
             e.preventDefault();
+            console.log("input");
             console.log(e);
 
             switch (e.inputType) {
                 case "insertFromPaste":
                 case "insertReplacementText":
                 case "insertText":
-                    // When insertFromPaste and insertReplacementText happen e.data is null 
+                    // When insertFromPaste and insertReplacementText happen e.data is null
                     // and their content inside of dataTransfer
                     const data =
                         e.data ??
@@ -159,14 +161,14 @@ class PlainTextDocument {
                                 data! +
                                 this.text[this.index].slice(end);
 
-                        this.cursorPos = begin + data!.length;
-                        this.currentRange = null;
+                            this.cursorPos = begin + data!.length;
+                            this.currentRange = null;
                         }
                     } else {
-                    this.text[this.index] =
-                        this.text[this.index].slice(0, this.cursorPos) +
+                        this.text[this.index] =
+                            this.text[this.index].slice(0, this.cursorPos) +
                             data! +
-                        this.text[this.index].slice(this.cursorPos);
+                            this.text[this.index].slice(this.cursorPos);
 
                         this.cursorPos += data!.length;
                     }
@@ -251,16 +253,16 @@ class PlainTextDocument {
                         // Case 2: Try to create paragraph in middle of a paragraph
                         const textToRemain = this.text[this.index].slice(
                             0,
-                            this.cursorPos
+                            this.cursorPos,
                         );
                         const textForNewParagraph = this.text[this.index].slice(
-                            this.cursorPos
+                            this.cursorPos,
                         );
                         this.text[this.index] = textToRemain;
                         this.text.splice(
                             this.index + 1,
                             0,
-                            textForNewParagraph
+                            textForNewParagraph,
                         );
                         // newCursorPos = textForNewParagraph.length;
                     }
@@ -281,11 +283,11 @@ class PlainTextDocument {
             const range = document.createRange();
             range.setStart(
                 this.node.childNodes[this.index].childNodes[0],
-                this.cursorPos
+                this.cursorPos,
             );
             range.setEnd(
                 this.node.childNodes[this.index].childNodes[0],
-                this.cursorPos
+                this.cursorPos,
             );
             const selection = window.getSelection();
             selection?.removeAllRanges();
@@ -318,7 +320,7 @@ class PlainTextDocument {
                 }
                 a.dataset.editor_index = index.toString();
                 return a;
-            })
+            }),
         );
     }
 }
@@ -326,6 +328,6 @@ class PlainTextDocument {
 const editor = document.getElementById("editor");
 const doc = new PlainTextDocument(
     editor!,
-    "This is editable. Jeez I'm going to have to make this really long in order for me to test text wrapping when my text editor. I'm noticing super weird behaviors\n\nJunior Was Here"
+    "This is editable. Jeez I'm going to have to make this really long in order for me to test text wrapping when my text editor. I'm noticing super weird behaviors\n\nJunior Was Here",
 );
 doc.render();
