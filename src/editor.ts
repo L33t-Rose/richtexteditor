@@ -3,12 +3,14 @@ class PlainTextDocument {
     text: string[];
     node: HTMLElement;
     cursorPos: number = 1;
+    fileId: string;
     index = 0;
     currentRange: Selection | null = null;
     constructor(node: HTMLElement, text: string) {
         this.text = text.split("\n");
         console.log(this.text);
         this.node = node;
+        this.fileId = crypto.randomUUID();
         this.registerListeners();
     }
     private getParentIndex(e: Node) {
@@ -323,6 +325,34 @@ class PlainTextDocument {
             }),
         );
     }
+    newFile() {
+        this.fileId = crypto.randomUUID();
+        this.text = [""];
+        this.render();
+    }
+    reset() {
+        this.cursorPos = 1;
+        this.index = 0;
+        this.currentRange = null;
+    }
+}
+
+function saveFile(editor: PlainTextDocument) {
+    console.log(editor.text.join("\n"));
+    localStorage.setItem(editor.fileId, editor.text.join("\n"));
+}
+// Was thinking of adding a callback function but for now this will be synchronous
+// Until I run into a situation where this needs to be async it will stay synchronous
+function loadFile(editor: PlainTextDocument, id: string) {
+    const text = localStorage.getItem(id);
+    if (!text) {
+        alert("Couldn't be found");
+        return;
+    }
+    editor.reset();
+    editor.fileId = id;
+    editor.text = text.split("\n");
+    editor.render();
 }
 
 const editor = document.getElementById("editor");
@@ -331,3 +361,30 @@ const doc = new PlainTextDocument(
     "This is editable. Jeez I'm going to have to make this really long in order for me to test text wrapping when my text editor. I'm noticing super weird behaviors\n\nJunior Was Here",
 );
 doc.render();
+// Editor UI
+const editorUIFileID = document.querySelector(".editor-menu__file-id")!;
+const saveBtn = document.querySelector<HTMLButtonElement>(
+    ".editor-menu__saveBtn",
+)!;
+const loadBtn = document.querySelector<HTMLButtonElement>(
+    ".editor-menu__loadBtn",
+)!;
+const newBtn = document.querySelector<HTMLButtonElement>(
+    ".editor-menu__newBtn",
+)!;
+editorUIFileID.textContent = doc.fileId;
+saveBtn.addEventListener("click", function (e) {
+    saveFile(doc);
+});
+loadBtn.addEventListener("click", function (e) {
+    const id = prompt("id");
+    if (!id) {
+        return;
+    }
+    loadFile(doc, id);
+    editorUIFileID.textContent = id;
+});
+newBtn.addEventListener("click", function (e) {
+    doc.newFile();
+    editorUIFileID.textContent = doc.fileId;
+});
