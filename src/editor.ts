@@ -4,13 +4,21 @@ class PlainTextDocument {
     node: HTMLElement;
     cursorPos: number = 1;
     index = 0;
+    currentRange: Selection | null = null;
     constructor(node: HTMLElement, text: string) {
         this.text = text.split("\n");
         console.log(this.text);
         this.node = node;
         this.registerListeners();
     }
-    private updateIndex(e: HTMLElement | EventTarget) {
+    private getParentIndex(e: Node) {
+        let current = e.parentElement!;
+        while (!("editor_index" in current.dataset)) {
+            current = e.parentElement!;
+        }
+        return Number.parseInt(current.dataset.editor_index!);
+    }
+    private updateIndex(e: HTMLElement | Node) {
         if (!(e instanceof HTMLElement) && !(e instanceof Node)) {
             throw new Error("Non-element passed into updateIndex");
         }
@@ -20,10 +28,9 @@ class PlainTextDocument {
         // TODO: Try to make the typesafety better with curr.dataset
         // @ts-expect-error
         while (curr.nodeName === "#text" || !("editor_index" in curr.dataset)) {
-            console.log(curr);
             if (!curr.parentElement) {
                 throw new Error(
-                    "Encountered element in editor that's not associated with any of our nodes"
+                    "Encountered element in editor that's not associated with any of our nodes",
                 );
             }
             curr = curr.parentElement;
@@ -32,64 +39,147 @@ class PlainTextDocument {
         const textIndex = Number.parseInt(curr.dataset.editor_index!);
         this.index = textIndex;
     }
+
     private registerListeners() {
         if (!this.node) {
             throw new Error("No node passed in");
         }
-        this.node.addEventListener("click", (e) => {
-            if (!e.target) {
+        // Turns out selectionchange doesn't activate for contenteditable elements for some reason...
+        document.addEventListener("selectionchange", (e) => {
+            console.log("cursorchange");
+            console.log("change", e, window.getSelection());
+            if (e.target === null) {
                 return;
             }
             const selection = window.getSelection();
             if (!selection) {
+                return;
+            }
+            // when you click out of the editor selectionchange gets triggered so we should check for this
+            // before updating any state.
+            if (selection.focusNode instanceof Document) {
+                console.log("Here");
                 return;
             }
             if (selection.type == "Range") {
-                throw new Error("We don't support ranges yet");
+                console.log("selection", selection);
+                this.currentRange = selection;
+                // throw new Error("We don't support ranges yet");
             }
-            this.cursorPos = selection.anchorOffset;
-            this.updateIndex(e.target);
+            this.cursorPos = selection.focusOffset;
+            this.updateIndex(selection.focusNode!);
             console.log("cursorPos", this.cursorPos, "index", this.index);
+            //@ts-ignore
+            debug.textContent = `cursorPos ${this.cursorPos}, "index", ${this.index}`;
         });
-        this.node.addEventListener("keyup", (e) => {
-            if (!e.target) {
-                return;
-            }
-            if (
-                e.key != "ArrowLeft" &&
-                e.key != "ArrowRight" &&
-                e.key != "ArrowUp" &&
-                e.key != "ArrowDown"
-            ) {
-                return;
-            }
-            console.log(e);
-            const selection = window.getSelection();
-            if (!selection) {
-                throw new Error("No Selection?");
-            }
-            console.log("selection after moving", selection);
-            this.cursorPos = selection.anchorOffset;
-            this.updateIndex(selection.anchorNode!);
-            console.log("cursorPos", this.cursorPos, "index", this.index);
-        });
-        this.node.addEventListener("beforeinput", (e) => {
+        this.node.addEventListener("beforeinput", async (e) => {
             e.preventDefault();
+            console.log("input");
             console.log(e);
 
             switch (e.inputType) {
+                case "insertFromPaste":
+                case "insertReplacementText":
                 case "insertText":
+                    // When insertFromPaste and insertReplacementText happen e.data is null
+                    // and their content inside of dataTransfer
+                    const data =
+                        e.data ??
+                        (await new Promise((res) => {
+                            e.dataTransfer?.items[0].getAsString((dtString) =>
+                                res(dtString),
+                            );
+                        }));
+                    console.log("data", data);
                     console.log("cursorPos", this.cursorPos);
-                    this.text[this.index] =
-                        this.text[this.index].slice(0, this.cursorPos) +
-                        e.data! +
-                        this.text[this.index].slice(this.cursorPos);
+                    // Notice how the code for handling range and caret selections are the same?
+                    // We should just merge these and just keep track of a currentSelection.
+                    if (this.currentRange) {
+                        // Multi-line support
+                        if (
+                            !(
+                                this.currentRange.anchorNode ===
+                                this.currentRange.focusNode
+                            )
+                        ) {
+                            // Compute the indexes of the anchor (a) and focus nodes (b)
+                            const top =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.focusNode!
+                                    : this.currentRange.anchorNode!;
 
-                    this.cursorPos += e.data!.length;
+                            const bottom =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.anchorNode!
+                                    : this.currentRange.focusNode!;
+                            const topOffset =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.focusOffset
+                                    : this.currentRange.anchorOffset;
+                            const bottomOffset =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.anchorOffset
+                                    : this.currentRange.focusOffset;
+
+                            const topIndex = this.getParentIndex(top);
+                            const bottomIndex = this.getParentIndex(bottom);
+
+                            // We might have to merge the text in the anchor with the focus
+                            const newText =
+                                this.text[topIndex].slice(0, topOffset) +
+                                data +
+                                this.text[bottomIndex].slice(bottomOffset);
+
+                            this.text[topIndex] = newText;
+
+                            // Delete everything between a to b
+                            this.text.splice(
+                                topIndex + 1,
+                                bottomIndex - topIndex,
+                            );
+
+                            // Update index to anchorNode's index and then update cursorPosition
+                            this.index = topIndex;
+                            this.cursorPos = topOffset + data!.length;
+                        } else {
+                            const begin =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.focusOffset
+                                    : this.currentRange.anchorOffset;
+                            const end =
+                                this.currentRange.direction === "backward"
+                                    ? this.currentRange.anchorOffset
+                                    : this.currentRange.focusOffset;
+                            console.log(
+                                "same?",
+                                this.currentRange.anchorNode ===
+                                    this.currentRange.focusNode,
+                            );
+
+                            this.text[this.index] =
+                                this.text[this.index].slice(0, begin) +
+                                data! +
+                                this.text[this.index].slice(end);
+
+                            this.cursorPos = begin + data!.length;
+                            this.currentRange = null;
+                        }
+                    } else {
+                        this.text[this.index] =
+                            this.text[this.index].slice(0, this.cursorPos) +
+                            data! +
+                            this.text[this.index].slice(this.cursorPos);
+
+                        this.cursorPos += data!.length;
+                    }
                     break;
                 case "deleteContentBackward":
                     console.log(this);
-                    if (this.index === 0 && this.cursorPos == 0) {
+                    if (
+                        !this.currentRange &&
+                        this.index === 0 &&
+                        this.cursorPos == 0
+                    ) {
                         return;
                     }
                     console.log(
@@ -97,9 +187,45 @@ class PlainTextDocument {
                         this.cursorPos,
                         "test",
                         this.text[this.index].slice(0, this.cursorPos - 1),
-                        this.text[this.index].slice(this.cursorPos)
+                        this.text[this.index].slice(this.cursorPos),
                     );
-                    if (this.cursorPos == 0) {
+                    if (this.currentRange) {
+                        const top =
+                            this.currentRange.direction === "backward"
+                                ? this.currentRange.focusNode!
+                                : this.currentRange.anchorNode!;
+
+                        const bottom =
+                            this.currentRange.direction === "backward"
+                                ? this.currentRange.anchorNode!
+                                : this.currentRange.focusNode!;
+                        const topOffset =
+                            this.currentRange.direction === "backward"
+                                ? this.currentRange.focusOffset
+                                : this.currentRange.anchorOffset;
+                        const bottomOffset =
+                            this.currentRange.direction === "backward"
+                                ? this.currentRange.anchorOffset
+                                : this.currentRange.focusOffset;
+                        const topIndex = this.getParentIndex(top);
+                        const bottomIndex = this.getParentIndex(bottom);
+
+                        // We might have to merge the text in the anchor with the focus
+                        const newText =
+                            this.text[topIndex].slice(0, topOffset) +
+                            this.text[bottomIndex].slice(bottomOffset);
+
+                        this.text[topIndex] = newText;
+
+                        // Delete everything between a to b
+                        this.text.splice(topIndex + 1, bottomIndex - topIndex);
+
+                        // Update index to anchorNode's index and then update cursorPosition
+                        this.index = topIndex;
+                        this.cursorPos = topOffset;
+                        // }
+                        this.currentRange = null;
+                    } else if (this.cursorPos == 0) {
                         const prevTextLength = this.text[this.index - 1].length;
                         // Combine the text above with the current one.
                         this.text[this.index - 1] =
@@ -127,16 +253,16 @@ class PlainTextDocument {
                         // Case 2: Try to create paragraph in middle of a paragraph
                         const textToRemain = this.text[this.index].slice(
                             0,
-                            this.cursorPos
+                            this.cursorPos,
                         );
                         const textForNewParagraph = this.text[this.index].slice(
-                            this.cursorPos
+                            this.cursorPos,
                         );
                         this.text[this.index] = textToRemain;
                         this.text.splice(
                             this.index + 1,
                             0,
-                            textForNewParagraph
+                            textForNewParagraph,
                         );
                         // newCursorPos = textForNewParagraph.length;
                     }
@@ -157,11 +283,11 @@ class PlainTextDocument {
             const range = document.createRange();
             range.setStart(
                 this.node.childNodes[this.index].childNodes[0],
-                this.cursorPos
+                this.cursorPos,
             );
             range.setEnd(
                 this.node.childNodes[this.index].childNodes[0],
-                this.cursorPos
+                this.cursorPos,
             );
             const selection = window.getSelection();
             selection?.removeAllRanges();
@@ -194,7 +320,7 @@ class PlainTextDocument {
                 }
                 a.dataset.editor_index = index.toString();
                 return a;
-            })
+            }),
         );
     }
 }
@@ -202,6 +328,6 @@ class PlainTextDocument {
 const editor = document.getElementById("editor");
 const doc = new PlainTextDocument(
     editor!,
-    "This is editable. Jeez I'm going to have to make this really long in order for me to test text wrapping when my text editor. I'm noticing super weird behaviors\n\nJunior Was Here"
+    "This is editable. Jeez I'm going to have to make this really long in order for me to test text wrapping when my text editor. I'm noticing super weird behaviors\n\nJunior Was Here",
 );
 doc.render();
