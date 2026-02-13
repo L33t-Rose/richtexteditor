@@ -328,6 +328,7 @@ class PlainTextDocument {
     newFile() {
         this.fileId = crypto.randomUUID();
         this.text = [""];
+        this.reset();
         this.render();
     }
     reset() {
