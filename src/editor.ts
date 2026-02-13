@@ -53,6 +53,9 @@ export class PlainTextDocument {
             if (e.target === null) {
                 return;
             }
+            if (e.target === document) {
+                return;
+            }
             const selection = window.getSelection();
             if (!selection) {
                 return;
