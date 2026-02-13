@@ -42,17 +42,12 @@ editorUIFileID.textContent = doc.fileId;
 saveBtn.addEventListener("click", function (e) {
     saveFile(doc);
 });
-loadBtn.addEventListener("click", function (e) {
-    const files = Object.entries(window.localStorage).filter((entry) =>
-        entry[0].startsWith(LS_PREFIX),
-    );
+function renderFiles(files: [string, any][]) {
+    fileList.replaceChildren();
     if (files.length === 0) {
-        alert("No files stored yet. Save your file");
+        fileList.textContent = "No more files!";
         return;
     }
-    console.log(files);
-    // Render File List inside of dialog
-    fileList.replaceChildren();
     fileList.append(
         ...files.map(([id, text]) => {
             const fileContainer = document.createElement("div");
@@ -72,12 +67,29 @@ loadBtn.addEventListener("click", function (e) {
             loadBtn.textContent = "Select";
             loadBtn.dataset.action = "load";
             loadBtn.dataset.fileId = id.slice(LS_PREFIX.length);
-            // const deleteBtn = document.createElement("button")
-            fileAction.append(loadBtn);
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.textContent = "Delete";
+            deleteBtn.dataset.action = "delete";
+            deleteBtn.dataset.fileId = id.slice(LS_PREFIX.length);
+
+            fileAction.append(loadBtn, deleteBtn);
             fileContainer.append(fileId, fileText, fileAction);
             return fileContainer;
         }),
     );
+}
+loadBtn.addEventListener("click", function (e) {
+    const files = Object.entries(window.localStorage).filter((entry) =>
+        entry[0].startsWith(LS_PREFIX),
+    );
+    if (files.length === 0) {
+        alert("No files stored yet. Save your file");
+        return;
+    }
+    console.log(files);
+    // Render File List inside of dialog
+    renderFiles(files);
     fileDialog.showModal();
     // loadFile(doc, id);
     // editorUIFileID.textContent = id;
@@ -98,8 +110,17 @@ fileList.addEventListener("click", function (e) {
         console.log(e.target.dataset.fileId);
         loadFile(doc, e.target.dataset.fileId!);
         editorUIFileID.textContent = e.target.dataset.fileId!;
+        fileDialog.close();
+    } else if (action === "delete") {
+        console.log("hit");
+        const LS_KEY = LS_PREFIX + e.target.dataset.fileId!;
+        console.log(LS_KEY);
+        localStorage.removeItem(LS_KEY);
+        const files = Object.entries(window.localStorage).filter((entry) =>
+            entry[0].startsWith(LS_PREFIX),
+        );
+        renderFiles(files);
     } else {
         throw new Error("WIP");
     }
-    fileDialog.close();
 });
