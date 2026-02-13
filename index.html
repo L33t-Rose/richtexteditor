@@ -7,16 +7,18 @@
         <title>Document</title>
     </head>
     <body>
-        <div class="editor-menu">
-            File ID: <span class="editor-menu__file-id"></span>
-            <div class="editor-menu__button-group">
-                <button class="editor-menu__newBtn">New File</button>
-                <button class="editor-menu__saveBtn">Save</button>
-                <button class="editor-menu__loadBtn">Load</button>
+        <section class="container">
+            <div class="editor-menu">
+                File ID: <span class="editor-menu__file-id"></span>
+                <div class="editor-menu__button-group">
+                    <button class="editor-menu__newBtn">New File</button>
+                    <button class="editor-menu__saveBtn">Save</button>
+                    <button class="editor-menu__loadBtn">Load</button>
+                </div>
             </div>
-        </div>
-        <div contenteditable="true" id="editor"></div>
-        <div id="debug"></div>
+            <div contenteditable="true" id="editor"></div>
+            <div id="debug"></div>
+        </section>
         <script src="./build/editor.js"></script>
     </body>
 </html>
