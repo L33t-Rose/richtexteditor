@@ -1,14 +1,16 @@
-class PlainTextDocument {
+export class PlainTextDocument {
     ref = this;
     text: string[];
     node: HTMLElement;
-    cursorPos: number = 1;
+    cursorPos: number = 0;
+    fileId: string;
     index = 0;
     currentRange: Selection | null = null;
     constructor(node: HTMLElement, text: string) {
         this.text = text.split("\n");
         console.log(this.text);
         this.node = node;
+        this.fileId = crypto.randomUUID();
         this.registerListeners();
     }
     private getParentIndex(e: Node) {
@@ -49,6 +51,9 @@ class PlainTextDocument {
             console.log("cursorchange");
             console.log("change", e, window.getSelection());
             if (e.target === null) {
+                return;
+            }
+            if (e.target === document) {
                 return;
             }
             const selection = window.getSelection();
@@ -323,11 +328,15 @@ class PlainTextDocument {
             }),
         );
     }
+    newFile() {
+        this.fileId = crypto.randomUUID();
+        this.text = [""];
+        this.reset();
+        this.render();
+    }
+    reset() {
+        this.cursorPos = 0;
+        this.index = 0;
+        this.currentRange = null;
+    }
 }
-
-const editor = document.getElementById("editor");
-const doc = new PlainTextDocument(
-    editor!,
-    "This is editable. Jeez I'm going to have to make this really long in order for me to test text wrapping when my text editor. I'm noticing super weird behaviors\n\nJunior Was Here",
-);
-doc.render();
