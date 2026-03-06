@@ -64,48 +64,57 @@ function insertTranformation(
         const prev = transformations[i];
         const isIntersecting =
             (incoming.begin >= prev.begin &&
-                incoming.begin <= prev.begin + prev.length) ||
+                incoming.begin < prev.begin + prev.length) ||
             (prev.begin >= incoming.begin &&
-                prev.begin <= incoming.begin + incoming.length);
+                prev.begin < incoming.begin + incoming.length);
         console.log("incoming", incoming, "\ncurr", prev, isIntersecting);
         if (incoming.begin < transformations[i].begin && !isIntersecting) {
             break;
         } else if (isIntersecting) {
             console.log("Intersection!");
             // Resolve Intersection
-
+            // In order for this to make sense I choose to assume that incoming is after prev then work with the edge cases from there.
             // If it's negative we'll know that incoming comes first;
             let incomingRemL = incoming.begin - prev.begin;
+            // If it's negative than prev has remaining
             let incomingRemR =
                 incoming.begin + incoming.length - (prev.begin + prev.length);
             // If this is positive then prev has some remaining on the left side
-            let prevRemL = incoming.begin - prev.begin;
-            let prevRemR =
-                incoming.begin + incoming.length - (prev.begin + prev.length);
+            let prevRemL = 0;
+            let prevRemR = 0;
             console.log(incomingRemL, incomingRemR, prevRemL, prevRemR);
+
+            if (incomingRemL < 0) {
+                incomingRemL = Math.abs(incomingRemL);
+                // prevRemL = Math.abs(incomingRemL);
+            } else {
+                prevRemL = Math.abs(incomingRemL);
+                incomingRemL = 0;
+                // incomingRemL = Math.abs(incomingRemL);
+            }
             if (incomingRemR < 0) {
-                prevRemR = Math.abs(prevRemR);
+                prevRemR = Math.abs(incomingRemR);
                 incomingRemR = 0;
             } else {
                 prevRemR = 0;
             }
-            if (incomingRemL < 0) {
-                prevRemL = 0;
-                incomingRemL = Math.abs(incomingRemL);
-            } else {
-                incomingRemL = 0;
-                prevRemL = Math.abs(prevRemL);
+            console.log(incomingRemL, incomingRemR, prevRemL, prevRemR);
+
+            const toInsert: Transformation[] = [];
+            if (incomingRemL > 0) {
+                toInsert.push({
+                    type: incoming.type,
+                    begin: incoming.begin,
+                    length: incomingRemL,
+                });
             }
-            const incomingL: Transformation = {
-                type: incoming.type,
-                begin: incoming.begin,
-                length: incomingRemL,
-            };
-            const prevL: Transformation = {
-                type: prev.type,
-                begin: prev.begin,
-                length: prevRemL,
-            };
+            if (prevRemL > 0) {
+                toInsert.push({
+                    type: prev.type,
+                    begin: prev.begin,
+                    length: prevRemL,
+                });
+            }
             const intersection: Transformation = {
                 type: prev.type + "_" + incoming.type,
                 begin: Math.max(prev.begin, incoming.begin),
@@ -115,41 +124,57 @@ function insertTranformation(
                     Math.max(prev.begin, incoming.begin) -
                     incomingRemR,
             };
-            const prevR: Transformation = {
-                type: prev.type,
-                begin: intersection.begin + intersection.length,
-                length: prevRemR,
-            };
-            const incomingR: Transformation = {
-                type: incoming.type,
-                begin: intersection.begin + intersection.length,
-                length: incomingRemR,
-            };
-            console.log(
-                "incomingL\n",
-                incomingL,
-                "\nprevL\n",
-                prevL,
-                "\nintersection\n",
-                intersection,
-                "\nprevR\n",
-                prevR,
-                "\nincomingR\n",
-                incomingR,
-            );
-            throw new Error("STOP");
+            toInsert.push(intersection);
+            if (prevRemR > 0) {
+                toInsert.push({
+                    type: prev.type,
+                    begin: intersection.begin + intersection.length,
+                    length: prevRemR,
+                });
+            }
+            transformations.splice(i, 1, ...toInsert);
+            console.log("insert", toInsert);
+            if (incomingRemR > 0) {
+                const incomingR: Transformation = {
+                    type: incoming.type,
+                    begin: intersection.begin + intersection.length,
+                    length: incomingRemR,
+                };
+                console.log("There is still some left of incoming", incomingR);
+                insertTranformation(
+                    transformations,
+                    incomingR,
+                    i + toInsert.length,
+                );
+            }
+            return;
         }
     }
     transformations.splice(i, 0, incoming);
 }
 const scratchArr: Transformation[] = [];
-// insertTranformation(scratchArr, { type: "strike", begin: 3, length: 6 });
-// insertTranformation(scratchArr, { type: "bold", begin: 6, length: 1 });
-// insertTranformation(scratchArr, { type: "bold", begin: 5, length: 4 });
-// insertTranformation(scratchArr, { type: "strike", begin: 3, length: 3 });
-// insertTranformation(scratchArr, { type: "italicize", begin: 1, length: 2 });
+insertTranformation(scratchArr, { type: "strike", begin: 3, length: 6 });
+console.log("t", scratchArr);
+
+insertTranformation(scratchArr, { type: "bold", begin: 6, length: 1 });
+console.log("t", scratchArr);
+
+insertTranformation(scratchArr, { type: "superscript", begin: 5, length: 4 });
+console.log("t", scratchArr);
+
+insertTranformation(scratchArr, { type: "subscript", begin: 3, length: 3 });
+console.log("t", scratchArr);
+
+insertTranformation(scratchArr, { type: "italicize", begin: 1, length: 2 });
+console.log("t", scratchArr);
+insertTranformation(scratchArr, { type: "underline", begin: 1, length: 3 });
+console.log("t", scratchArr);
+insertTranformation(scratchArr, { type: "underline", begin: 9, length: 3 });
+console.log("t", scratchArr);
+insertTranformation(scratchArr, { type: "bold", begin: 9 - 2, length: 3 });
+console.log("t", scratchArr);
+
 // insertTranformation(scratchArr, { type: "bold", begin: 0, length: 4 });
-console.log(scratchArr);
 const tagMap = { bold: "b", italicize: "i" };
 const transformedText = function (str: string) {
     // merge??
@@ -274,6 +299,6 @@ const transformedText = function (str: string) {
     return [transforms, shifts];
 };
 
-console.log(transformedText("Test here idk"));
+// console.log(transformedText("Test here idk"));
 
 // console.log(transformedText);
