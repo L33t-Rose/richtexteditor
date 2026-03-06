@@ -61,53 +61,94 @@ function insertTranformation(
     let i = startFrom;
     // Find spot to put it
     for (i; i < transformations.length; i++) {
-        const currTransform = transformations[i];
+        const prev = transformations[i];
         const isIntersecting =
-            (incoming.begin >= currTransform.begin &&
-                incoming.begin <= currTransform.begin + currTransform.length) ||
-            (currTransform.begin >= incoming.begin &&
-                currTransform.begin <= incoming.begin + incoming.length);
-        console.log(
-            "incoming",
-            incoming,
-            "\ncurr",
-            currTransform,
-            isIntersecting,
-        );
+            (incoming.begin >= prev.begin &&
+                incoming.begin <= prev.begin + prev.length) ||
+            (prev.begin >= incoming.begin &&
+                prev.begin <= incoming.begin + incoming.length);
+        console.log("incoming", incoming, "\ncurr", prev, isIntersecting);
         if (incoming.begin < transformations[i].begin && !isIntersecting) {
             break;
         } else if (isIntersecting) {
-            const isIncomingBeforeCurr = incoming.begin < currTransform.begin;
+            console.log("Intersection!");
             // Resolve Intersection
-            // For my sanity rn I will just have two branching paths for
-            if (isIncomingBeforeCurr) {
-                console.log("Intersection", currTransform, incoming);
-                let currRemL = incoming.begin - currTransform.begin;
-                let currRemR = 0;
-                let incomingRemL = 0;
-                let incomingRemR = 0;
+
+            // If it's negative we'll know that incoming comes first;
+            let incomingRemL = incoming.begin - prev.begin;
+            let incomingRemR =
+                incoming.begin + incoming.length - (prev.begin + prev.length);
+            // If this is positive then prev has some remaining on the left side
+            let prevRemL = incoming.begin - prev.begin;
+            let prevRemR =
+                incoming.begin + incoming.length - (prev.begin + prev.length);
+            console.log(incomingRemL, incomingRemR, prevRemL, prevRemR);
+            if (incomingRemR < 0) {
+                prevRemR = Math.abs(prevRemR);
+                incomingRemR = 0;
             } else {
-                let currRemL = incoming.begin - currTransform.begin;
-                let currRemR = 0;
-                let incomingRemL = 0;
-                let incomingRemR =
+                prevRemR = 0;
+            }
+            if (incomingRemL < 0) {
+                prevRemL = 0;
+                incomingRemL = Math.abs(incomingRemL);
+            } else {
+                incomingRemL = 0;
+                prevRemL = Math.abs(prevRemL);
+            }
+            const incomingL: Transformation = {
+                type: incoming.type,
+                begin: incoming.begin,
+                length: incomingRemL,
+            };
+            const prevL: Transformation = {
+                type: prev.type,
+                begin: prev.begin,
+                length: prevRemL,
+            };
+            const intersection: Transformation = {
+                type: prev.type + "_" + incoming.type,
+                begin: Math.max(prev.begin, incoming.begin),
+                length:
                     incoming.begin +
                     incoming.length -
-                    (currTransform.begin + currTransform.length);
-                if (incomingRemR < 0) {
-                    currRemR = currTransform.length + incomingRemR;
-                    incomingRemR = 0;
-                }
-            }
+                    Math.max(prev.begin, incoming.begin) -
+                    incomingRemR,
+            };
+            const prevR: Transformation = {
+                type: prev.type,
+                begin: intersection.begin + intersection.length,
+                length: prevRemR,
+            };
+            const incomingR: Transformation = {
+                type: incoming.type,
+                begin: intersection.begin + intersection.length,
+                length: incomingRemR,
+            };
+            console.log(
+                "incomingL\n",
+                incomingL,
+                "\nprevL\n",
+                prevL,
+                "\nintersection\n",
+                intersection,
+                "\nprevR\n",
+                prevR,
+                "\nincomingR\n",
+                incomingR,
+            );
+            throw new Error("STOP");
         }
     }
     transformations.splice(i, 0, incoming);
 }
 const scratchArr: Transformation[] = [];
-insertTranformation(scratchArr, { type: "bold", begin: 5, length: 4 });
-insertTranformation(scratchArr, { type: "strike", begin: 3, length: 3 });
-insertTranformation(scratchArr, { type: "italicize", begin: 1, length: 2 });
-insertTranformation(scratchArr, { type: "bold", begin: 0, length: 4 });
+// insertTranformation(scratchArr, { type: "strike", begin: 3, length: 6 });
+// insertTranformation(scratchArr, { type: "bold", begin: 6, length: 1 });
+// insertTranformation(scratchArr, { type: "bold", begin: 5, length: 4 });
+// insertTranformation(scratchArr, { type: "strike", begin: 3, length: 3 });
+// insertTranformation(scratchArr, { type: "italicize", begin: 1, length: 2 });
+// insertTranformation(scratchArr, { type: "bold", begin: 0, length: 4 });
 console.log(scratchArr);
 const tagMap = { bold: "b", italicize: "i" };
 const transformedText = function (str: string) {
