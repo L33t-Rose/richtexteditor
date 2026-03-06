@@ -57,7 +57,6 @@ function insertTranformation(
     incoming: Transformation,
     startFrom: number = 0,
 ) {
-    // if(t)
     let i = startFrom;
     // Find spot to put it
     for (i; i < transformations.length; i++) {
@@ -86,17 +85,13 @@ function insertTranformation(
 
             if (incomingRemL < 0) {
                 incomingRemL = Math.abs(incomingRemL);
-                // prevRemL = Math.abs(incomingRemL);
             } else {
                 prevRemL = Math.abs(incomingRemL);
                 incomingRemL = 0;
-                // incomingRemL = Math.abs(incomingRemL);
             }
             if (incomingRemR < 0) {
                 prevRemR = Math.abs(incomingRemR);
                 incomingRemR = 0;
-            } else {
-                prevRemR = 0;
             }
             console.log(incomingRemL, incomingRemR, prevRemL, prevRemR);
 
