@@ -74,8 +74,8 @@ function insertTranformation(
             // Resolve Intersection
             // In order for this to make sense I choose to assume that incoming is after prev then work with the edge cases from there.
             // If it's negative we'll know that incoming comes first;
+            // Otherwise prev has remaining
             let incomingRemL = incoming.begin - prev.begin;
-            // If it's negative than prev has remaining
             let incomingRemR =
                 incoming.begin + incoming.length - (prev.begin + prev.length);
             // If this is positive then prev has some remaining on the left side
@@ -171,3 +171,24 @@ console.log("t", scratchArr);
 
 // insertTranformation(scratchArr, { type: "bold", begin: 0, length: 4 });
 const tagMap = { bold: "b", italicize: "i" };
+
+// Can this work with my text division idea
+const contentTransformations: Transformation[] = [];
+insertTranformation(contentTransformations, {
+    type: "text",
+    begin: 0,
+    length: 100,
+});
+console.log("c", contentTransformations);
+insertTranformation(contentTransformations, {
+    type: "anchor",
+    begin: 0,
+    length: 10,
+});
+console.log("c", contentTransformations);
+insertTranformation(contentTransformations, {
+    type: "anchor",
+    begin: 20,
+    length: 15,
+});
+console.log("c", contentTransformations);
