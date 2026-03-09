@@ -192,3 +192,30 @@ insertTranformation(contentTransformations, {
     length: 15,
 });
 console.log("c", contentTransformations);
+
+type _Range = {
+    begin: number;
+    length: number;
+};
+
+type _Transformation = {
+    type: number;
+    attributes: Record<any, any>;
+} & _Range;
+
+function end(a: _Range) {
+    return a.begin + a.length;
+}
+
+const temp: _Transformation = {
+    type: 1,
+    attributes: {},
+    begin: 0,
+    length: 3,
+};
+end(temp);
+
+type TextNode = {
+    type: string;
+    attributes: Record<any, any> | null;
+} & _Range;

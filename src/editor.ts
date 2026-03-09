@@ -1,14 +1,54 @@
+type _Range = {
+    begin: number;
+    length: number;
+};
+type Transformation = {
+    type: number;
+    begin: number;
+    length: number;
+};
+type TextNode = {
+    type: string;
+    begin: number;
+    length: number;
+    attributes: Record<any, any> | null;
+    tranformations: Transformation[];
+};
+type ContentNode = {
+    type: string;
+    textIdx: number;
+    attributes: Record<any, any> | null;
+    children: TextNode[];
+};
 export class PlainTextDocument {
-    ref = this;
     text: string[];
     node: HTMLElement;
     cursorPos: number = 0;
     fileId: string;
     index = 0;
     currentRange: Selection | null = null;
+    content: ContentNode[];
     constructor(node: HTMLElement, text: string) {
         this.text = text.split("\n");
+        this.content = this.text.map((text, i) => {
+            const contentNode: ContentNode = {
+                type: "paragraph",
+                attributes: null,
+                textIdx: i,
+                children: [
+                    {
+                        type: "text",
+                        attributes: null,
+                        begin: 0,
+                        length: text.length,
+                        tranformations: [],
+                    },
+                ],
+            };
+            return contentNode;
+        });
         console.log(this.text);
+        console.log(this.content);
         this.node = node;
         this.fileId = crypto.randomUUID();
         this.registerListeners();
@@ -248,9 +288,16 @@ export class PlainTextDocument {
                     console.log(this.cursorPos, this.text[this.index].length);
                     // Need to handle two case
                     let newCursorPos = 0;
+                    const node: ContentNode = {
+                        type: "paragraph",
+                        attributes: null,
+                        children: [],
+                        textIdx: this.index + 1,
+                    };
                     // Case 1: Trying to create paragraph at end of paragraph
                     if (this.cursorPos == this.text[this.index].length) {
                         this.text.splice(this.index + 1, 0, "");
+                        this.content.splice(this.index + 1, 0, node);
                     } else {
                         // Case 2: Try to create paragraph in middle of a paragraph
                         const textToRemain = this.text[this.index].slice(
@@ -266,9 +313,50 @@ export class PlainTextDocument {
                             0,
                             textForNewParagraph,
                         );
+                        // Find the text node that cursorPos lies within
+                        let i = 0;
+                        for (
+                            i;
+                            i < this.content[this.index].children.length;
+                            i++
+                        ) {
+                            const node = this.content[this.index].children[i];
+                            if (
+                                this.cursorPos >= node.begin &&
+                                this.cursorPos <= node.begin + node.length
+                            ) {
+                                break;
+                            }
+                        }
+                        const within = this.content[this.index].children[i];
+                        const right: TextNode = {
+                            type: within.type,
+                            begin: 0,
+                            length:
+                                within.begin + within.length - this.cursorPos,
+                            attributes: within.attributes,
+                            tranformations: [],
+                        };
+                        this.content[this.index].children[i].length =
+                            this.cursorPos - within.begin;
+                        const len = this.content[this.index].children.length;
+                        const rest = this.content[this.index].children.splice(
+                            i + 1,
+                            len - (i + 1),
+                        );
+                        node.children.push(right, ...rest);
+                        this.content.splice(this.index + 1, 0, node);
+                        for (
+                            let j = this.index + 2;
+                            j < this.content.length;
+                            j++
+                        ) {
+                            this.content[j].textIdx++;
+                        }
                         // newCursorPos = textForNewParagraph.length;
                     }
                     console.log(this.text);
+                    console.log(this.content);
                     this.cursorPos = 0;
                     this.index += 1;
                     break;
@@ -297,33 +385,38 @@ export class PlainTextDocument {
         });
     }
     render() {
-        this.node.replaceChildren(
-            ...this.text.map((part, index) => {
-                const a = document.createElement("p");
-
-                if (part === "") {
-                    a.appendChild(document.createElement("br"));
+        this.node.replaceChildren();
+        console.log("RENDER", this.content);
+        for (let i = 0; i < this.content.length; i++) {
+            const node = this.content[i];
+            const element = ((cNode: ContentNode) => {
+                if (cNode.type === "paragraph") {
+                    return document.createElement("p");
+                } else if (cNode.type === "heading") {
+                    return document.createElement(`h${node.attributes.level}`);
                 } else {
-                    // Per the spec the browser trims whitespace so I'm manually escaping the last space when rendering
-                    // TODO: We don't support tabs right now because pressing tab will cause the focus to leave the editor
-                    let toBeDisplayed = part.replaceAll(/\s{2}/gm, " &nbsp;");
-                    if (toBeDisplayed.startsWith(" ")) {
-                        toBeDisplayed = "&nbsp;" + toBeDisplayed.slice(1);
-                    }
-                    if (toBeDisplayed.endsWith(" ")) {
-                        toBeDisplayed =
-                            toBeDisplayed.slice(0, toBeDisplayed.length - 1) +
-                            "&nbsp;";
-                    }
-
-                    // We need to do alternating between space and escaped space because if we don't the browser
-                    // Will treat content as one long word thus preventing word wrapping to fail..
-                    a.innerHTML = toBeDisplayed;
+                    throw new Error("Unrecognized content node type");
                 }
-                a.dataset.editor_index = index.toString();
-                return a;
-            }),
-        );
+            })(node);
+            const text = this.text[i];
+            if (node.type === "paragraph" && text === "") {
+                element.appendChild(document.createElement("br"));
+            } else {
+                // Don't worry about transformations for now
+                let toBeDisplayed = text.replaceAll(/\s{2}/gm, " &nbsp;");
+                if (toBeDisplayed.startsWith(" ")) {
+                    toBeDisplayed = "&nbsp;" + toBeDisplayed.slice(1);
+                }
+                if (toBeDisplayed.endsWith(" ")) {
+                    toBeDisplayed =
+                        toBeDisplayed.slice(0, toBeDisplayed.length - 1) +
+                        "&nbsp;";
+                }
+                element.textContent = toBeDisplayed;
+            }
+            element.dataset.editor_index = i.toString();
+            this.node.appendChild(element);
+        }
     }
     newFile() {
         this.fileId = crypto.randomUUID();
