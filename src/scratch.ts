@@ -47,11 +47,11 @@ console.log(
     typeToTextArr((BOLD ^ ITALICIZE) | (ITALICIZE ^ BOLD ^ STRIKETHROUGH)),
 );
 type Transformation = { type: string; begin: number; length: number };
-const transformations: Transformation[] = [
-    { type: "bold", begin: 0, length: 4 },
-    // // { type: "strike", begin: 3, length: 3 },
-    { type: "italicize", begin: 1, length: 5 },
-];
+// const transformations: Transformation[] = [
+//     { type: "bold", begin: 0, length: 4 },
+//     // // { type: "strike", begin: 3, length: 3 },
+//     { type: "italicize", begin: 1, length: 5 },
+// ];
 function insertTranformation(
     transformations: Transformation[],
     incoming: Transformation,
@@ -147,75 +147,183 @@ function insertTranformation(
     }
     transformations.splice(i, 0, incoming);
 }
-const scratchArr: Transformation[] = [];
-insertTranformation(scratchArr, { type: "strike", begin: 3, length: 6 });
-console.log("t", scratchArr);
+// const scratchArr: Transformation[] = [];
+// insertTranformation(scratchArr, { type: "strike", begin: 3, length: 6 });
+// console.log("t", scratchArr);
 
-insertTranformation(scratchArr, { type: "bold", begin: 6, length: 1 });
-console.log("t", scratchArr);
+// insertTranformation(scratchArr, { type: "bold", begin: 6, length: 1 });
+// console.log("t", scratchArr);
 
-insertTranformation(scratchArr, { type: "superscript", begin: 5, length: 4 });
-console.log("t", scratchArr);
+// insertTranformation(scratchArr, { type: "superscript", begin: 5, length: 4 });
+// console.log("t", scratchArr);
 
-insertTranformation(scratchArr, { type: "subscript", begin: 3, length: 3 });
-console.log("t", scratchArr);
+// insertTranformation(scratchArr, { type: "subscript", begin: 3, length: 3 });
+// console.log("t", scratchArr);
 
-insertTranformation(scratchArr, { type: "italicize", begin: 1, length: 2 });
-console.log("t", scratchArr);
-insertTranformation(scratchArr, { type: "underline", begin: 1, length: 3 });
-console.log("t", scratchArr);
-insertTranformation(scratchArr, { type: "underline", begin: 9, length: 3 });
-console.log("t", scratchArr);
-insertTranformation(scratchArr, { type: "bold", begin: 9 - 2, length: 3 });
-console.log("t", scratchArr);
+// insertTranformation(scratchArr, { type: "italicize", begin: 1, length: 2 });
+// console.log("t", scratchArr);
+// insertTranformation(scratchArr, { type: "underline", begin: 1, length: 3 });
+// console.log("t", scratchArr);
+// insertTranformation(scratchArr, { type: "underline", begin: 9, length: 3 });
+// console.log("t", scratchArr);
+// insertTranformation(scratchArr, { type: "bold", begin: 9 - 2, length: 3 });
+// console.log("t", scratchArr);
 
 // insertTranformation(scratchArr, { type: "bold", begin: 0, length: 4 });
 const tagMap = { bold: "b", italicize: "i" };
 
 // Can this work with my text division idea
-const contentTransformations: Transformation[] = [];
-insertTranformation(contentTransformations, {
-    type: "text",
-    begin: 0,
-    length: 100,
-});
-console.log("c", contentTransformations);
-insertTranformation(contentTransformations, {
-    type: "anchor",
-    begin: 0,
-    length: 10,
-});
-console.log("c", contentTransformations);
-insertTranformation(contentTransformations, {
-    type: "anchor",
-    begin: 20,
-    length: 15,
-});
-console.log("c", contentTransformations);
+// const contentTransformations: Transformation[] = [];
+// insertTranformation(contentTransformations, {
+//     type: "text",
+//     begin: 0,
+//     length: 100,
+// });
+// console.log("c", contentTransformations);
+// insertTranformation(contentTransformations, {
+//     type: "anchor",
+//     begin: 0,
+//     length: 10,
+// });
+// console.log("c", contentTransformations);
+// insertTranformation(contentTransformations, {
+//     type: "anchor",
+//     begin: 20,
+//     length: 15,
+// });
+// console.log("c", contentTransformations);
 
-type _Range = {
-    begin: number;
+type _Transformation = {
+    type: string;
     length: number;
 };
 
-type _Transformation = {
-    type: number;
-    attributes: Record<any, any>;
-} & _Range;
+function newInsertTransformation(
+    transformations: _Transformation[],
+    incomingBegin: number,
+    incoming: _Transformation,
+) {
+    let pos = 0;
+    let i = 0;
+    while (i < transformations.length) {
+        const prev = transformations[i];
+        const isIntersecting =
+            incomingBegin >= pos && incomingBegin < pos + prev.length;
+        const posOffsetToAdd = prev.length;
+        let incrementBy = 1;
+        if (isIntersecting) {
+            const batch: _Transformation[] = [];
+            const intersectTransform = {
+                type: prev.type + "_" + incoming.type,
+                length:
+                    Math.min(
+                        pos + prev.length,
+                        incomingBegin + incoming.length,
+                    ) - incomingBegin,
+            };
+            batch.push(intersectTransform);
+            incrementBy++;
+            let prevRemL = incomingBegin - pos;
 
-function end(a: _Range) {
-    return a.begin + a.length;
+            let prevRemR =
+                pos + prev.length - (incomingBegin + intersectTransform.length);
+
+            if (prevRemR > 0) {
+                let prevR: _Transformation = {
+                    type: prev.type,
+                    length: prevRemR,
+                };
+                batch.push(prevR);
+                incrementBy += 1;
+            }
+            transformations.splice(i + 1, 0, ...batch);
+            prev.length = prevRemL;
+            if (prev.length === 0) {
+                transformations.splice(i, 1);
+                incrementBy--;
+            }
+
+            // This number should never be negative;
+            let incomingRemR = incoming.length - intersectTransform.length;
+            if (incomingRemR === 0) {
+                break;
+            }
+            incoming.length -= intersectTransform.length;
+            incomingBegin += intersectTransform.length;
+        }
+        // console.log(incrementBy, transformations, transformations.length);
+        pos += posOffsetToAdd;
+        i += incrementBy;
+    }
 }
 
-const temp: _Transformation = {
-    type: 1,
-    attributes: {},
-    begin: 0,
-    length: 3,
-};
-end(temp);
+const t: _Transformation[] = [{ type: "", length: 25 }];
+// newInsertTransformation(t, 2, { type: "bold" });
+console.log("begining t", structuredClone(t));
+console.log("----------");
 
-type TextNode = {
-    type: string;
-    attributes: Record<any, any> | null;
-} & _Range;
+let begin = performance.now();
+newInsertTransformation(t, 6, { type: "bold", length: 1 });
+let end = performance.now();
+console.log("t", structuredClone(t), end - begin);
+console.log("----------");
+
+begin = performance.now();
+newInsertTransformation(t, 3, { type: "strike", length: 6 });
+end = performance.now();
+console.log("t", structuredClone(t), end - begin);
+console.log("----------");
+
+begin = performance.now();
+newInsertTransformation(t, 5, { type: "superscript", length: 4 });
+end = performance.now();
+console.log("t", structuredClone(t), end - begin);
+console.log("----------");
+
+begin = performance.now();
+newInsertTransformation(t, 3, { type: "subscript", length: 3 });
+end = performance.now();
+console.log("t", structuredClone(t), end - begin);
+console.log("----------");
+
+begin = performance.now();
+newInsertTransformation(t, 1, { type: "italicize", length: 2 });
+end = performance.now();
+console.log("t", structuredClone(t), end - begin);
+console.log("----------");
+
+begin = performance.now();
+newInsertTransformation(t, 1, { type: "underline", length: 3 });
+end = performance.now();
+console.log("t", structuredClone(t), end - begin);
+console.log("----------");
+
+begin = performance.now();
+newInsertTransformation(t, 9, { type: "underline", length: 3 });
+end = performance.now();
+console.log("t", structuredClone(t), end - begin);
+console.log("----------");
+
+begin = performance.now();
+newInsertTransformation(t, 9 - 2, { type: "bold", length: 3 });
+end = performance.now();
+console.log("t", structuredClone(t), end - begin);
+console.log("----------");
+
+const contentTransformations: _Transformation[] = [
+    {
+        type: "text",
+        length: 100,
+    },
+];
+console.log("c", structuredClone(contentTransformations));
+newInsertTransformation(contentTransformations, 0, {
+    type: "anchor",
+    length: 10,
+});
+console.log("c", structuredClone(contentTransformations));
+newInsertTransformation(contentTransformations, 20, {
+    type: "anchor",
+    length: 15,
+});
+console.log("c", structuredClone(contentTransformations));

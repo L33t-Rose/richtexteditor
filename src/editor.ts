@@ -1,15 +1,12 @@
 type _Range = {
-    begin: number;
     length: number;
 };
 type Transformation = {
     type: number;
-    begin: number;
     length: number;
 };
 type TextNode = {
     type: string;
-    begin: number;
     length: number;
     attributes: Record<any, any> | null;
     tranformations: Transformation[];
@@ -39,9 +36,8 @@ export class PlainTextDocument {
                     {
                         type: "text",
                         attributes: null,
-                        begin: 0,
                         length: text.length,
-                        tranformations: [],
+                        tranformations: [{ type: 0, length: text.length }],
                     },
                 ],
             };
@@ -315,6 +311,7 @@ export class PlainTextDocument {
                         );
                         // Find the text node that cursorPos lies within
                         let i = 0;
+                        let pos = 0;
                         for (
                             i;
                             i < this.content[this.index].children.length;
@@ -322,38 +319,57 @@ export class PlainTextDocument {
                         ) {
                             const node = this.content[this.index].children[i];
                             if (
-                                this.cursorPos >= node.begin &&
-                                this.cursorPos <= node.begin + node.length
+                                this.cursorPos >= pos &&
+                                this.cursorPos <= pos + node.length
                             ) {
                                 break;
                             }
+                            pos += node.length;
                         }
                         const within = this.content[this.index].children[i];
-                        const right: TextNode = {
+                        const slicedNode: TextNode = {
                             type: within.type,
-                            begin: 0,
-                            length:
-                                within.begin + within.length - this.cursorPos,
+                            length: pos + within.length - this.cursorPos,
                             attributes: within.attributes,
                             tranformations: [],
                         };
-                        this.content[this.index].children[i].length =
-                            this.cursorPos - within.begin;
-                        const len = this.content[this.index].children.length;
-                        const rest = this.content[this.index].children.splice(
-                            i + 1,
-                            len - (i + 1),
-                        );
-                        node.children.push(right, ...rest);
-                        this.content.splice(this.index + 1, 0, node);
-                        for (
-                            let j = this.index + 2;
-                            j < this.content.length;
-                            j++
-                        ) {
-                            this.content[j].textIdx++;
+                        within.length = this.cursorPos - pos;
+
+                        // Slice transformations at cursorPos
+                        const ts = within.tranformations;
+                        let j = 0;
+                        let tPos = 0;
+                        for (j; j < ts.length; j++) {
+                            const node = ts[j];
+                            if (
+                                this.cursorPos >= tPos &&
+                                this.cursorPos <= tPos + node.length
+                            ) {
+                                break;
+                            }
+                            tPos += node.length;
                         }
-                        // newCursorPos = textForNewParagraph.length;
+                        const target = ts[j];
+                        const slicedTransformation = {
+                            type: target.type,
+                            length: tPos + target.length - this.cursorPos,
+                        };
+                        target.length = this.cursorPos - tPos;
+
+                        const tLen = within.tranformations.length;
+                        const proceedingTransformations =
+                            within.tranformations.splice(j + 1, tLen - (j + 1));
+                        slicedNode.tranformations.push(
+                            slicedTransformation,
+                            ...proceedingTransformations,
+                        );
+
+                        const len = this.content[this.index].children.length;
+                        const proceedingTextNodes = this.content[
+                            this.index
+                        ].children.splice(i + 1, len - (i + 1));
+                        node.children.push(slicedNode, ...proceedingTextNodes);
+                        this.content.splice(this.index + 1, 0, node);
                     }
                     console.log(this.text);
                     console.log(this.content);
@@ -393,6 +409,7 @@ export class PlainTextDocument {
                 if (cNode.type === "paragraph") {
                     return document.createElement("p");
                 } else if (cNode.type === "heading") {
+                    // @ts-expect-error
                     return document.createElement(`h${node.attributes.level}`);
                 } else {
                     throw new Error("Unrecognized content node type");
@@ -412,7 +429,7 @@ export class PlainTextDocument {
                         toBeDisplayed.slice(0, toBeDisplayed.length - 1) +
                         "&nbsp;";
                 }
-                element.textContent = toBeDisplayed;
+                element.innerHTML = toBeDisplayed;
             }
             element.dataset.editor_index = i.toString();
             this.node.appendChild(element);
