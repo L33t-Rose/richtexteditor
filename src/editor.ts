@@ -128,6 +128,9 @@ export class PlainTextDocument {
                                 res(dtString),
                             );
                         }));
+                    if (!data) {
+                        throw new Error("Got empty data. Investigate");
+                    }
                     console.log("data", data);
                     console.log("cursorPos", this.cursorPos);
                     // Notice how the code for handling range and caret selections are the same?
@@ -203,11 +206,46 @@ export class PlainTextDocument {
                             this.currentRange = null;
                         }
                     } else {
+                        console.log("singlee");
                         this.text[this.index] =
                             this.text[this.index].slice(0, this.cursorPos) +
                             data! +
                             this.text[this.index].slice(this.cursorPos);
 
+                        const node = this.content[this.index];
+                        console.log(node);
+                        // Search for textNode and increment length
+                        let textPos = 0;
+                        for (let i = 0; i < node.children.length; i++) {
+                            const textNode = node.children[i];
+                            if (
+                                this.cursorPos >= textPos &&
+                                this.cursorPos <= textPos + textNode.length
+                            ) {
+                                textNode.length += data.length;
+                                // Find the transformation that cursor is within and increment
+                                let transformPos = 0;
+                                for (
+                                    let j = 0;
+                                    j < textNode.tranformations.length;
+                                    j++
+                                ) {
+                                    const tranformation =
+                                        textNode.tranformations[i];
+                                    if (
+                                        this.cursorPos >= textPos &&
+                                        this.cursorPos <=
+                                            textPos + tranformation.length
+                                    ) {
+                                        tranformation.length += data.length;
+                                        break;
+                                    }
+                                    transformPos += tranformation.length;
+                                }
+                                break;
+                            }
+                            textPos += textNode.length;
+                        }
                         this.cursorPos += data!.length;
                     }
                     break;
